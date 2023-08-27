@@ -7,25 +7,18 @@ import openai
 
 def get_pdf_text(path: str) -> str:
     reader = PdfReader(path)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    return text
+    return "".join(page.extract_text() for page in reader.pages)
 
 
-def analyze_resume(resume: str) -> str:
+def get_prompt() -> str:
     with open("prompt.txt") as f:
-        prompt = f.read()
+        return f.read()
 
+
+def analyze_resume_with_prompt(resume: str, prompt: str) -> str:
     messages = [
-        {
-            "role": "system",
-            "content": "你現在是一個專業的 ai 工程師，你需要幫忙篩選履歷",
-        },
-        {
-            "role": "user",
-            "content": prompt.replace("{{prompt}}", resume)
-        },
+        {"role": "system", "content": "你現在是一個專業的 ai 工程師，你需要幫忙篩選履歷"},
+        {"role": "user", "content": prompt.replace("{{prompt}}", resume)}
     ]
     response = openai.ChatCompletion.create(
         model="gpt-4",
@@ -35,17 +28,30 @@ def analyze_resume(resume: str) -> str:
     return response.choices[0].message.content
 
 
-if __name__ == '__main__':
+def save_analysis_to_file(name: str, analysis: str):
+    with open(name, "w") as f:
+        f.write(analysis)
+
+
+def process_pdf(pdf_name: str, pdf_path: str, prompt: str):
+    print(f"ready to analyze: {pdf_name}")
+    text = get_pdf_text(pdf_path)
+    analysis = analyze_resume_with_prompt(text, prompt)
+    print("got analysis")
+    output_name = f"outputs/{pdf_name.split('.')[0]}.txt"
+    save_analysis_to_file(output_name, analysis)
+    print(f"saved to {output_name}")
+    print("-" * 50)
+
+
+def main():
     load_dotenv()
     openai.api_key = os.getenv("OPENAI_API_KEY")
+    prompt = get_prompt()
 
     for pdf in pathlib.Path("pdfs").glob("*.pdf"):
-        print(f"ready to analyze: {pdf.name}")
-        text = get_pdf_text(str(pdf))
-        analysis = analyze_resume(text)
-        print("got analysis")
-        name = f"outputs/{pdf.name.split('.')[0]}.txt"
-        with open(name, "w") as f:
-            f.write(analysis)
-        print(f"saved to {name}")
-        print("-" * 50)
+        process_pdf(pdf.name, str(pdf), prompt)
+
+
+if __name__ == '__main__':
+    main()
