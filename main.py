@@ -1,8 +1,10 @@
+import io
 import os
 from PyPDF2 import PdfReader
 import pathlib
 from dotenv import load_dotenv
 import openai
+import streamlit as st
 
 
 def get_pdf_text(path: str) -> str:
@@ -33,15 +35,11 @@ def save_analysis_to_file(name: str, analysis: str):
         f.write(analysis)
 
 
-def process_pdf(pdf_name: str, pdf_path: str, prompt: str):
+def process_pdf(pdf_name: str, bytes_data: io.BytesIO, prompt: str) -> str:
     print(f"ready to analyze: {pdf_name}")
-    text = get_pdf_text(pdf_path)
+    text = get_pdf_text(bytes_data)
     analysis = analyze_resume_with_prompt(text, prompt)
-    print("got analysis")
-    output_name = f"outputs/{pdf_name.split('.')[0]}.txt"
-    save_analysis_to_file(output_name, analysis)
-    print(f"saved to {output_name}")
-    print("-" * 50)
+    return analysis
 
 
 def main():
@@ -49,8 +47,12 @@ def main():
     openai.api_key = os.getenv("OPENAI_API_KEY")
     prompt = get_prompt()
 
-    for pdf in pathlib.Path("pdfs").glob("*.pdf"):
-        process_pdf(pdf.name, str(pdf), prompt)
+    uploaded_files = st.file_uploader("Choose a CSV file", accept_multiple_files=True)
+    for uploaded_file in uploaded_files:
+        bytes_data = uploaded_file.read()
+        st.write("filename:", uploaded_file.name)
+        processed_data = process_pdf(uploaded_file.name, io.BytesIO(bytes_data), prompt)
+        st.markdown(processed_data)
 
 
 if __name__ == '__main__':
